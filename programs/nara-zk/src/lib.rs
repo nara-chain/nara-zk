@@ -73,8 +73,10 @@ pub mod nara_zk {
         }
 
         // leaf = Poseidon(id_commitment, deposit_index_as_32bytes)
+        // Big-endian in the last 4 bytes so the 32-byte array represents
+        // the field element `deposit_index`, matching the circuit's depositIndex signal.
         let mut index_bytes = [0u8; 32];
-        index_bytes[..4].copy_from_slice(&deposit_index.to_le_bytes());
+        index_bytes[28..].copy_from_slice(&deposit_index.to_be_bytes());
         let leaf = poseidon::hash_pair(&id_commitment, &index_bytes)?;
 
         // Transfer SOL: depositor → pool

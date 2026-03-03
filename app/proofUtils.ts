@@ -207,8 +207,9 @@ export function validRecipient(): { keypair: any; fieldElement: bigint } {
  * Generate a Groth16 withdraw proof.
  *
  * @param idSecret         - private id_secret (BigInt)
- * @param depositIndex     - which deposit this is (BigInt, 0 for first)
- * @param filledSubtrees   - on-chain filled_subtrees at time of deposit
+ * @param depositIndex     - personal deposit count for this ZK ID (used in leaf hash + nullifier)
+ * @param leafIndex        - global Merkle tree position where the leaf was inserted
+ * @param filledSubtrees   - on-chain filled_subtrees after the last deposit
  * @param zeros            - precomputed empty-subtree hashes
  * @param root             - on-chain Merkle root (32 bytes)
  * @param recipient        - recipient public key
@@ -217,13 +218,14 @@ export function validRecipient(): { keypair: any; fieldElement: bigint } {
 export async function generateWithdrawProof(
   idSecret: bigint,
   depositIndex: bigint,
+  leafIndex: bigint,
   filledSubtrees: Buffer[],
   zeros: bigint[],
   root: Buffer,
   recipient: PublicKey
 ): Promise<{ proof: Buffer; nullifierHash: Buffer }> {
   const { pathElements, pathIndices } = await buildMerklePath(
-    depositIndex,
+    leafIndex,
     filledSubtrees,
     zeros
   );
