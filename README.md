@@ -2,7 +2,7 @@
 
 A named ZK anonymous transfer protocol on NARA. Users register a human-readable ZK ID (e.g. `"alice"`); anyone who knows the name can deposit funds to it, while the owner can withdraw anonymously — no on-chain link between the ZK ID and the withdrawal address is ever created.
 
-**Program ID**: `Dp4Jb4fmfK1HHVzjMAnWumE5iLuzDsfc4VdRVL7XmY82`
+**Program ID**: `ZKidentity111111111111111111111111111111111`
 **Framework**: Anchor 0.32 · **Proof system**: Groth16 (BN254) · **Hash**: Poseidon
 
 ---
