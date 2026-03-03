@@ -29,14 +29,10 @@ impl InboxAccount {
 
 #[zero_copy]
 #[repr(C)]
+#[derive(Default)]
 pub struct InboxEntry {
     pub leaf_index: u64,  // u64 matches MerkleTreeAccount.next_index; 16B total, no padding needed
     pub denomination: u64,
-}
-impl Default for InboxEntry {
-    fn default() -> Self {
-        Self { leaf_index: 0, denomination: 0 }
-    }
 }
 impl InboxEntry {
     pub const SIZE: usize = 8 + 8; // = 16 bytes

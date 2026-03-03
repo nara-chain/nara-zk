@@ -7,6 +7,7 @@
 /// Off-chain (test / native build), we delegate to light-poseidon via
 /// the same approach used in solana-program 1.18.
 use anchor_lang::prelude::*;
+#[cfg(target_os = "solana")]
 use crate::errors::NaraZkError;
 
 /// Bn254X5 Poseidon parameters (the only supported variant).
