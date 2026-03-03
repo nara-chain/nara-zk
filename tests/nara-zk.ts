@@ -9,6 +9,7 @@ import {
   findTreePda,
   findPoolPda,
   findZkIdPda,
+  findInboxPda,
   DENOMINATIONS,
   toBytes32,
 } from "../app/utils";
@@ -405,7 +406,7 @@ describe("nara-zk", () => {
     ).to.be.true;
   });
 
-  it("deposit: bob first deposit (leafIndex=2, depositIndex=0)", async () => {
+  it("deposit: payer (a) deposits first time to bob's ZK ID", async () => {
     await program.methods
       .deposit(toBytes32(bobHash), denom)
       .accounts({ depositor: payer.publicKey })
@@ -416,7 +417,7 @@ describe("nara-zk", () => {
     expect(zkIdData.depositCount).to.equal(1);
   });
 
-  it("deposit: bob second deposit (leafIndex=3, depositIndex=1)", async () => {
+  it("deposit: payer (a) deposits second time to bob's ZK ID", async () => {
     await program.methods
       .deposit(toBytes32(bobHash), denom)
       .accounts({ depositor: payer.publicKey })
@@ -427,9 +428,26 @@ describe("nara-zk", () => {
     expect(zkIdData.depositCount).to.equal(2);
   });
 
-  it("withdraw: bob withdraws second deposit (depositIndex=1, leafIndex=3)", async () => {
-    // Tree has 4 leaves: alice×2 (indices 0,1) + bob×2 (indices 2,3).
-    // Bob's 2nd deposit: depositIndex=1 (personal counter), leafIndex=3 (global).
+  it("withdraw: bob (b) reads inbox on-chain and withdraws most recent deposit", async () => {
+    // Step 1: Bob reads his InboxAccount to discover the most recent leaf_index.
+    // This is the realistic flow: depositor (a) doesn't need to tell bob anything;
+    // bob just checks his inbox on-chain.
+    const INBOX_CAPACITY = 64;
+    const [inboxPda] = findInboxPda(bobHash, program.programId);
+    const inboxData = await program.account.inboxAccount.fetch(inboxPda);
+    const head = inboxData.head as number;
+    const lastEntryIdx = (head - 1 + INBOX_CAPACITY) % INBOX_CAPACITY;
+    const latestEntry = (inboxData.entries as any[])[lastEntryIdx];
+    const leafIndex = BigInt(latestEntry.leafIndex.toString()); // from chain
+
+    // Step 2: Bob reads his ZkIdAccount to derive depositIndex.
+    // deposit_count is incremented after each deposit, so the most recent
+    // deposit used depositIndex = deposit_count - 1.
+    const [zkIdPda] = findZkIdPda(bobHash, program.programId);
+    const zkIdData = await program.account.zkIdAccount.fetch(zkIdPda);
+    const depositIndex = BigInt((zkIdData.depositCount as number) - 1); // from chain
+
+    // Step 3: Bob reads MerkleTreeAccount for the current root and sibling path.
     const [treePda] = findTreePda(denom, program.programId);
     const treeData = await program.account.merkleTreeAccount.fetch(treePda);
     const rootIdx: number = treeData.currentRootIndex as number;
@@ -440,11 +458,12 @@ describe("nara-zk", () => {
 
     const { keypair: recipientKp } = validRecipient();
 
+    // Step 4: Generate proof using only chain-fetched data + private idSecret.
     const { proof: proofBuf, nullifierHash: nullifierBuf } =
       await generateWithdrawProof(
         bobIdSecret,
-        1n, // depositIndex: bob's 2nd deposit
-        3n, // leafIndex: global tree position (alice×2 + bob deposit 1 = index 3 is bob's 2nd)
+        depositIndex, // read from ZkIdAccount on-chain
+        leafIndex,    // read from InboxAccount on-chain
         filledSubtrees,
         zeros,
         rootBuf,
