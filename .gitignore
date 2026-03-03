@@ -1,0 +1,13 @@
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+.claude
+
+# Circuit trusted-setup (large; regenerate locally)
+circuits/build/*.ptau
+circuits/build/**/*_0000.zkey
+circuits/build/rust/
