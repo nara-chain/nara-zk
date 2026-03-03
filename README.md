@@ -39,24 +39,24 @@ A named ZK anonymous transfer protocol on Solana. Users register a human-readabl
 
 ```
                   ┌──────────────────────────────────────────────┐
-                  │  Off-chain (user device)                      │
-                  │                                               │
-                  │  wallet.signMessage(                          │
+                  │  Off-chain (user device)                     │
+                  │                                              │
+                  │  wallet.signMessage(                         │
                   │    "nara-zk:idsecret:v1:{name}"              │
-                  │  ) ──► sig (64 B) ──► SHA-256 ──► idSecret  │
-                  │                                               │
-                  │  idCommitment = Poseidon(idSecret)            │
-                  │  nameHash     = SHA-256("nara-zk:" + name)    │
-                  └───────────────┬───────────────────────────────┘
+                  │  ) ──► sig (64 B) ──► SHA-256 ──► idSecret   │
+                  │                                              │
+                  │  idCommitment = Poseidon(idSecret)           │
+                  │  nameHash     = SHA-256("nara-zk:" + name)   │
+                  └───────────────┬──────────────────────────────┘
                                   │  only nameHash + idCommitment
                                   │  transmitted off-chain
                                   ▼
 register(nameHash, idCommitment)  ←── any payer may submit
 
          ┌──────────────────┐   ┌──────────────────────┐
-         │  ZkIdAccount     │   │  InboxAccount         │
-         │  nameHash        │   │  ring buffer [64]     │
-         │  idCommitment    │   │  (leafIndex, denom)   │
+         │  ZkIdAccount     │   │  InboxAccount        │
+         │  nameHash        │   │  ring buffer [64]    │
+         │  idCommitment    │   │  (leafIndex, denom)  │
          │  depositCount    │   └──────────────────────┘
          │  commitStartIdx  │
          └──────────────────┘
@@ -67,8 +67,8 @@ deposit(nameHash, denom)  ←── anyone may call
          │
          ▼
   ┌──────────────────┐   ┌──────────────────────┐
-  │  MerkleTree      │   │  PoolAccount          │
-  │  64-level tree   │   │  SOL vault (PDA)      │
+  │  MerkleTree      │   │  PoolAccount         │
+  │  64-level tree   │   │  SOL vault (PDA)     │
   │  roots[30]       │   └──────────────────────┘
   └──────────────────┘
 
