@@ -89,6 +89,18 @@ describe("nara-zk", () => {
     expect(configData.feeAmount.toString()).to.equal(FEE_AMOUNT.toString());
   });
 
+  it("initialize_config: rejects duplicate initialization (singleton)", async () => {
+    try {
+      await program.methods
+        .initializeConfig(feeRecipient.publicKey, new anchor.BN(0))
+        .accounts({ admin: payer.publicKey })
+        .rpc();
+      expect.fail("Expected duplicate init to fail");
+    } catch (err: any) {
+      expect(err.message).to.match(/already in use|0x0/i);
+    }
+  });
+
   // ── initialize ───────────────────────────────────────────────────────────────
 
   it("initialize: creates Merkle tree + pool for 1 SOL denomination", async () => {
@@ -593,6 +605,41 @@ describe("nara-zk", () => {
     } catch (err: any) {
       expect(err.message).to.match(/Unauthorized|Caller is not the program admin/i);
     }
+  });
+
+  it("update_config: transfers admin; old admin is locked out, new admin can act", async () => {
+    const [configPda] = findConfigPda(program.programId);
+    const newAdmin = Keypair.generate();
+
+    // Transfer admin to newAdmin
+    await program.methods
+      .updateConfig(newAdmin.publicKey, feeRecipient.publicKey, new anchor.BN(FEE_AMOUNT))
+      .accounts({ admin: payer.publicKey })
+      .rpc();
+
+    let configData = await program.account.configAccount.fetch(configPda);
+    expect(configData.admin.toString()).to.equal(newAdmin.publicKey.toString());
+
+    // Old admin (payer) should now be rejected
+    try {
+      await program.methods
+        .updateConfig(payer.publicKey, feeRecipient.publicKey, new anchor.BN(0))
+        .accounts({ admin: payer.publicKey })
+        .rpc();
+      expect.fail("Expected Unauthorized for old admin");
+    } catch (err: any) {
+      expect(err.message).to.match(/Unauthorized|Caller is not the program admin/i);
+    }
+
+    // New admin transfers ownership back to payer (cleanup for subsequent tests)
+    await program.methods
+      .updateConfig(payer.publicKey, feeRecipient.publicKey, new anchor.BN(FEE_AMOUNT))
+      .accounts({ admin: newAdmin.publicKey })
+      .signers([newAdmin])
+      .rpc();
+
+    configData = await program.account.configAccount.fetch(configPda);
+    expect(configData.admin.toString()).to.equal(payer.publicKey.toString());
   });
 
   // ── multi-denomination ───────────────────────────────────────────────────────
