@@ -9,16 +9,79 @@ A named ZK anonymous transfer protocol on Solana. Users register a human-readabl
 
 ## Table of Contents
 
-1. [Privacy Goals](#privacy-goals)
-2. [Architecture Overview](#architecture-overview)
-3. [Cryptographic Design](#cryptographic-design)
-4. [ZK Circuits](#zk-circuits)
-5. [On-Chain Implementation](#on-chain-implementation)
-6. [Account Structure](#account-structure)
-7. [Instructions](#instructions)
-8. [Privacy Analysis](#privacy-analysis)
-9. [File Structure](#file-structure)
-10. [Development Guide](#development-guide)
+1. [What is a ZK ID?](#what-is-a-zk-id)
+2. [Privacy Goals](#privacy-goals)
+3. [Architecture Overview](#architecture-overview)
+4. [Cryptographic Design](#cryptographic-design)
+5. [ZK Circuits](#zk-circuits)
+6. [On-Chain Implementation](#on-chain-implementation)
+7. [Account Structure](#account-structure)
+8. [Instructions](#instructions)
+9. [Privacy Analysis](#privacy-analysis)
+10. [File Structure](#file-structure)
+11. [Development Guide](#development-guide)
+
+---
+
+## What is a ZK ID?
+
+A **ZK ID** is a human-readable name (e.g. `"alice"`) that acts as a private, reusable receiving address — similar in spirit to ENS or SNS names, but with a fundamentally different privacy model.
+
+### The Core Properties
+
+| Property | Behaviour |
+| -------- | --------- |
+| **Named** | Anyone who knows the name `"alice"` can deposit SOL to it — no wallet address needed |
+| **Private** | No on-chain link ever connects the name to the owner's wallet address |
+| **Ownable** | Ownership is proven by knowledge of a cryptographic secret (`idSecret`), not by a signing key |
+| **Transferable** | Ownership can be transferred to a new secret via a ZK proof — without revealing either secret |
+
+### How It Works
+
+```
+  Name: "alice"
+      │
+      │  SHA-256("nara-zk:alice")
+      ▼
+  nameHash  ──────────────────────────────► stored on-chain (ZkIdAccount)
+                                             anyone can deposit to this hash
+
+  wallet.signMessage("nara-zk:idsecret:v1:alice")
+      │
+      │  SHA-256(signature)  →  mod BN254_PRIME
+      ▼
+  idSecret  (stays on your device; never transmitted)
+      │
+      │  Poseidon(idSecret)
+      ▼
+  idCommitment  ──────────────────────────► stored on-chain (ZkIdAccount)
+                                             proves ownership without revealing idSecret
+```
+
+### Why Not Just Use a Wallet Address?
+
+A regular wallet address is a permanent, linkable identity: every deposit to `alice.sol` is publicly connected to Alice's withdrawal address. A ZK ID breaks this link:
+
+- **Deposit** only requires the name — the depositor never learns the owner's wallet.
+- **Withdrawal** is submitted by any payer (e.g. a gas relayer) to any recipient address. The Groth16 proof convinces the program that the caller knows `idSecret` without revealing it or the owner's address.
+- **Registration** can be submitted by a third-party relayer, so Alice's wallet address never even appears in the registration transaction.
+
+### Lifecycle of a ZK ID
+
+```
+  1. Register   Alice derives idSecret locally, computes idCommitment,
+                and asks a relayer to call register(nameHash, idCommitment).
+
+  2. Receive    Bob calls deposit("alice", 1 SOL) — Alice's address is unknown to Bob.
+
+  3. Withdraw   Alice generates a Groth16 proof off-chain and sends it to
+                a relayer, which calls withdraw(..., recipient=AliceNewWallet).
+                No on-chain record links "alice" to AliceNewWallet.
+
+  4. Transfer   Alice can hand over ownership to a new idSecret (e.g. after
+                a wallet compromise) by submitting an ownership ZK proof.
+                The ZK ID name stays the same; the secret changes.
+```
 
 ---
 
