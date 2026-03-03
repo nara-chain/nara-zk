@@ -8,10 +8,12 @@ export const PROGRAM_ID = new PublicKey(
 
 /** Fixed denomination pools (lamports). */
 export const DENOMINATIONS = {
-  SOL_1: new BN("1000000000"),
-  SOL_10: new BN("10000000000"),
-  SOL_100: new BN("100000000000"),
-  SOL_1000: new BN("1000000000000"),
+  SOL_1:      new BN("1000000000"),
+  SOL_10:     new BN("10000000000"),
+  SOL_100:    new BN("100000000000"),
+  SOL_1000:   new BN("1000000000000"),
+  SOL_10000:  new BN("10000000000000"),
+  SOL_100000: new BN("100000000000000"),
 };
 
 /**
