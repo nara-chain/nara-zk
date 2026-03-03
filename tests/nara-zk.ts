@@ -18,6 +18,8 @@ import {
   computeIdCommitment,
   commitmentToBytes,
   randomIdSecret,
+  makeKeypairSigner,
+  deriveIdSecret,
   validRecipient,
   generateWithdrawProof,
   generateOwnershipProof,
@@ -82,7 +84,7 @@ describe("nara-zk", () => {
   // ── register ─────────────────────────────────────────────────────────────────
 
   it("register: creates ZK ID for alice with real id_commitment", async () => {
-    aliceIdSecret = randomIdSecret();
+    aliceIdSecret = await deriveIdSecret(makeKeypairSigner(payer.secretKey), ALICE);
     const commitment = await computeIdCommitment(aliceIdSecret);
     aliceIdCommitmentBuf = commitmentToBytes(commitment);
 
@@ -211,7 +213,8 @@ describe("nara-zk", () => {
   // ── transfer_zk_id ───────────────────────────────────────────────────────────
 
   it("transfer_zk_id: updates id_commitment using a real ownership proof", async () => {
-    aliceNewIdSecret = randomIdSecret();
+    const newWallet = Keypair.generate();
+    aliceNewIdSecret = await deriveIdSecret(makeKeypairSigner(newWallet.secretKey), ALICE);
     const newCommitment = await computeIdCommitment(aliceNewIdSecret);
     aliceNewCommitmentBuf = commitmentToBytes(newCommitment);
 
@@ -389,7 +392,7 @@ describe("nara-zk", () => {
   // Bob's deposits will occupy leafIndex 2 and 3.
 
   it("register: creates ZK ID for bob", async () => {
-    bobIdSecret = randomIdSecret();
+    bobIdSecret = await deriveIdSecret(makeKeypairSigner(payer.secretKey), BOB);
     const commitment = await computeIdCommitment(bobIdSecret);
     bobIdCommitmentBuf = commitmentToBytes(commitment);
 

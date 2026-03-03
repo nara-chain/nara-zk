@@ -9,8 +9,10 @@
  *   bytes 192..256  proof_c: G1  C point, big-endian uncompressed
  */
 import path from "path";
+import { createHash } from "crypto";
 import { buildPoseidon as _buildPoseidon } from "circomlibjs";
 import { groth16 } from "snarkjs";
+import nacl from "tweetnacl";
 import { PublicKey } from "@solana/web3.js";
 
 // BN254 scalar field prime
@@ -168,6 +170,38 @@ export function randomIdSecret(): bigint {
   const buf = randomBytes(40) as Buffer;
   const n = BigInt("0x" + buf.toString("hex"));
   return (n % (BN254_PRIME - 1n)) + 1n; // avoid 0
+}
+
+/**
+ * Wrap a Keypair's secret key into a signMessage-compatible function.
+ * Suitable for tests; in production use the wallet adapter's signMessage.
+ */
+export function makeKeypairSigner(
+  secretKey: Uint8Array
+): (msg: Uint8Array) => Promise<Uint8Array> {
+  return async (msg: Uint8Array) => nacl.sign.detached(msg, secretKey);
+}
+
+/**
+ * Derive a deterministic id_secret from a wallet's signMessage capability.
+ *
+ * Protocol:
+ *   message  = UTF-8("nara-zk:idsecret:v1:" + name)
+ *   sig      = signMessage(message)           // 64 bytes, Ed25519 deterministic
+ *   idSecret = SHA256(sig) mod BN254_PRIME    // 32 bytes → BigInt, reduced into field
+ *
+ * Including `name` in the message ensures a different idSecret per ZK ID,
+ * even when the same wallet owns multiple ZK IDs.
+ */
+export async function deriveIdSecret(
+  signMessage: (msg: Uint8Array) => Promise<Uint8Array>,
+  name: string
+): Promise<bigint> {
+  const message = Buffer.from(`nara-zk:idsecret:v1:${name}`);
+  const sig = await signMessage(message);                   // 64 bytes
+  const digest = createHash("sha256").update(sig).digest(); // 32 bytes
+  const n = BigInt("0x" + digest.toString("hex"));
+  return (n % (BN254_PRIME - 1n)) + 1n; // avoid 0, keep in field
 }
 
 /**
