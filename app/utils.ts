@@ -69,6 +69,10 @@ export function findInboxPda(
   );
 }
 
+export function findConfigPda(programId = PROGRAM_ID): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from("config")], programId);
+}
+
 export function findNullifierPda(
   denomination: BN,
   nullifierHash: Buffer,

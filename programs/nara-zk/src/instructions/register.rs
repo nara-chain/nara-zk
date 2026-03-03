@@ -1,12 +1,28 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program;
 
-use crate::state::{InboxAccount, ZkIdAccount};
+use crate::errors::NaraZkError;
+use crate::state::{ConfigAccount, InboxAccount, ZkIdAccount};
 
 pub(crate) fn handle(
     ctx: Context<Register>,
     name_hash: [u8; 32],
     id_commitment: [u8; 32],
 ) -> Result<()> {
+    let fee = ctx.accounts.config.fee_amount;
+    if fee > 0 {
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: ctx.accounts.fee_recipient.to_account_info(),
+                },
+            ),
+            fee,
+        )?;
+    }
+
     let zk_id = &mut ctx.accounts.zk_id;
     zk_id.name_hash = name_hash;
     zk_id.id_commitment = id_commitment;
@@ -19,7 +35,7 @@ pub(crate) fn handle(
     inbox.count = 0;
     inbox.bump = ctx.bumps.inbox;
 
-    msg!("Registered ZK ID");
+    msg!("Registered ZK ID, fee paid: {} lamports", fee);
     Ok(())
 }
 
@@ -43,6 +59,20 @@ pub struct Register<'info> {
         bump,
     )]
     pub inbox: AccountLoader<'info, InboxAccount>,
+
+    #[account(
+        seeds = [b"config"],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, ConfigAccount>,
+
+    /// Receives the registration fee. Must match config.fee_recipient.
+    /// CHECK: key is validated by the constraint below.
+    #[account(
+        mut,
+        constraint = fee_recipient.key() == config.fee_recipient @ NaraZkError::InvalidFeeRecipient,
+    )]
+    pub fee_recipient: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }

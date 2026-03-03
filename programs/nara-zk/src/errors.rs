@@ -28,4 +28,10 @@ pub enum NaraZkError {
 
     #[msg("Poseidon hash computation failed")]
     PoseidonHashFailed,
+
+    #[msg("Caller is not the program admin")]
+    Unauthorized,
+
+    #[msg("Fee recipient account does not match config")]
+    InvalidFeeRecipient,
 }
