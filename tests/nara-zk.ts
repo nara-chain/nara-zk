@@ -563,6 +563,89 @@ describe("nara-zk", () => {
     }
   });
 
+  // ── post-transfer alice: new owner works, old id_secret cannot ───────────────
+  // Tree state: alice 2 deposits (idx 0,1) + bob 2 deposits (idx 2,3) = next_index=4.
+  // Alice's deposit_count=2, commitment_start_index=2 (set by transfer_zk_id).
+  // The next alice deposit (depositIndex=2) will use aliceNewCommitmentBuf.
+
+  it("transfer_zk_id: post-transfer deposit — new owner withdraws, old id_secret cannot produce proof", async () => {
+    // Deposit after transfer: leaf = Poseidon(aliceNewCommitment, 2), leafIndex=4
+    await program.methods
+      .deposit(toBytes32(aliceHash), denom)
+      .accounts({ depositor: payer.publicKey })
+      .rpc();
+
+    // Read all chain data (same on-chain flow as bob's withdrawal test)
+    const INBOX_CAPACITY = 64;
+    const [inboxPda] = findInboxPda(aliceHash, program.programId);
+    const inboxData = await program.account.inboxAccount.fetch(inboxPda);
+    const head = inboxData.head as number;
+    const lastEntryIdx = (head - 1 + INBOX_CAPACITY) % INBOX_CAPACITY;
+    const latestEntry = (inboxData.entries as any[])[lastEntryIdx];
+    const leafIndex = BigInt(latestEntry.leafIndex.toString()); // 4
+
+    const [zkIdPda] = findZkIdPda(aliceHash, program.programId);
+    const zkIdData = await program.account.zkIdAccount.fetch(zkIdPda);
+    const depositIndex = BigInt((zkIdData.depositCount as number) - 1); // 2
+
+    const [treePda] = findTreePda(denom, program.programId);
+    const treeData = await program.account.merkleTreeAccount.fetch(treePda);
+    const rootIdx: number = treeData.currentRootIndex as number;
+    const rootBuf = Buffer.from(treeData.roots[rootIdx] as number[]);
+    const filledSubtrees = (treeData.filledSubtrees as number[][]).map((s) =>
+      Buffer.from(s)
+    );
+
+    const { keypair: recipientKp } = validRecipient();
+
+    // Old id_secret cannot produce a valid Groth16 proof:
+    //   leaf = Poseidon(Poseidon(aliceIdSecret), 2) ≠ actual leaf in tree
+    //   (which used aliceNewIdSecret's commitment) → circuit constraint fails.
+    try {
+      await generateWithdrawProof(
+        aliceIdSecret, // old secret — wrong commitment
+        depositIndex,
+        leafIndex,
+        filledSubtrees,
+        zeros,
+        rootBuf,
+        recipientKp.publicKey
+      );
+      expect.fail("Old id_secret should not produce a valid proof for post-transfer deposit");
+    } catch (err: any) {
+      expect(err).to.be.instanceOf(Error);
+    }
+
+    // New owner (aliceNewIdSecret) generates a valid proof and withdraws.
+    const { proof: proofBuf, nullifierHash: nullifierBuf } =
+      await generateWithdrawProof(
+        aliceNewIdSecret, // new secret — correct commitment
+        depositIndex,
+        leafIndex,
+        filledSubtrees,
+        zeros,
+        rootBuf,
+        recipientKp.publicKey
+      );
+
+    const [poolPda] = findPoolPda(denom, program.programId);
+    const poolBalBefore = await provider.connection.getBalance(poolPda);
+
+    await program.methods
+      .withdraw(
+        proofBuf,
+        toBytes32(rootBuf),
+        toBytes32(nullifierBuf),
+        recipientKp.publicKey,
+        denom
+      )
+      .accounts({ payer: payer.publicKey, recipient: recipientKp.publicKey })
+      .rpc();
+
+    const poolBalAfter = await provider.connection.getBalance(poolPda);
+    expect(poolBalBefore - poolBalAfter).to.equal(LAMPORTS_PER_SOL);
+  });
+
   // ── update_config ────────────────────────────────────────────────────────────
 
   it("update_config: admin sets fee to 0 (free registration)", async () => {
