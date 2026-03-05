@@ -363,12 +363,12 @@ The tree has 64 levels and can accommodate up to 2^64 leaves. Insertions run in 
 ```rust
 pub struct MerkleTreeAccount {              // zero_copy
     pub levels:             u32,            // = 64
-    pub filled_subtrees:    [[u8; 32]; 64], // last completed left subtree hash per level
-    pub roots:              [[u8; 32]; 30], // circular buffer of the 30 most recent roots
     pub current_root_index: u32,            // index of the current root in roots[]
     pub next_index:         u64,            // next available global leaf position
     pub denomination:       u64,
-    pub bump:               u8,
+    pub filled_subtrees:    [[u8; 32]; 64], // last completed left subtree hash per level
+    pub roots:              [[u8; 32]; 30], // circular buffer of the 30 most recent roots
+    pub zeros:              [[u8; 32]; 64], // precomputed empty-subtree hashes
 }
 ```
 
@@ -390,8 +390,7 @@ pub struct InboxAccount {               // zero_copy
     pub entries: [InboxEntry; 64],      // INBOX_SIZE = 64 (power of two, required by bytemuck)
     pub head:    u8,                    // write pointer (next write position)
     pub count:   u8,                    // number of valid entries (capped at 64)
-    pub bump:    u8,
-    pub _pad:    [u8; 5],
+    pub _pad:    [u8; 6],
 }
 ```
 
@@ -426,13 +425,12 @@ solana_poseidon::hashv(
 ### `ConfigAccount` — seed `["config"]`
 
 ```rust
-pub struct ConfigAccount {
+pub struct ConfigAccount {              // zero_copy
     pub admin:         Pubkey,  // sole authority for update_config
     pub fee_recipient: Pubkey,  // receives registration fees
     pub fee_amount:    u64,     // lamports per registration; 0 = free
-    pub bump:          u8,
 }
-// Total: 8 (discriminator) + 32 + 32 + 8 + 1 = 81 bytes
+// Total: 8 (discriminator) + 32 + 32 + 8 = 80 bytes
 ```
 
 Singleton PDA. Anchor's `init` constraint guarantees it can only be created once.
@@ -445,9 +443,8 @@ pub struct ZkIdAccount {
     pub id_commitment:          [u8; 32], // Poseidon(idSecret); updated by transfer_zk_id
     pub deposit_count:          u32,      // total deposits; equals the next depositIndex
     pub commitment_start_index: u32,      // depositIndex at which the current commitment became active
-    pub bump:                   u8,
 }
-// Total: 8 + 32 + 32 + 4 + 4 + 1 = 81 bytes
+// Total: 8 + 32 + 32 + 4 + 4 = 80 bytes
 ```
 
 `commitment_start_index` partitions deposits by ownership epoch:
@@ -469,7 +466,7 @@ Zero-copy 64-entry ring buffer of `(leaf_index, denomination)` pairs.
 
 ### `NullifierAccount` — seed `["nullifier", denom_le8, nullifier_hash]`
 
-Contains only `bump: u8` (9 bytes total). Its mere existence marks the corresponding deposit as spent.
+Empty account (8-byte discriminator only). Its mere existence marks the corresponding deposit as spent.
 
 ---
 
@@ -487,9 +484,9 @@ effect   : Creates ConfigAccount; sets config.admin = caller.
 ### `update_config`
 
 ```
-accounts : admin (Signer), config (mut PDA, has_one = admin @ Unauthorized)
+accounts : admin (Signer), config (mut PDA, constraint: admin == config.admin)
 params   : new_admin: Pubkey, new_fee_recipient: Pubkey, new_fee_amount: u64
-effect   : Updates all three fields. The has_one constraint enforces that only
+effect   : Updates all three fields. The constraint enforces that only
            the current admin can call this; the old admin is immediately locked
            out after a transfer.
 ```
@@ -634,7 +631,7 @@ programs/nara-zk/src/
 │   ├── inbox.rs                # InboxAccount (zero_copy ring buffer) + InboxEntry
 │   ├── merkle_tree.rs          # MerkleTreeAccount (zero_copy, 64 levels)
 │   ├── pool.rs                 # PoolAccount
-│   └── nullifier.rs            # NullifierAccount (bump only, 9 bytes)
+│   └── nullifier.rs            # NullifierAccount (empty, 8-byte discriminator only)
 └── instructions/
     ├── initialize_config.rs
     ├── update_config.rs

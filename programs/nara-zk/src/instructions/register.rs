@@ -43,7 +43,7 @@ pub struct Register<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// ZkIdAccount is small (81 bytes), init in-transaction is fine.
+    /// ZkIdAccount is small, init in-transaction is fine.
     #[account(
         init, payer = payer, space = ZkIdAccount::SIZE,
         seeds = [b"zk_id", name_hash.as_ref()],

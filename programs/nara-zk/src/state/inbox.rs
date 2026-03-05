@@ -4,7 +4,7 @@ use crate::constants::INBOX_SIZE;
 
 /// Inbox ring buffer. PDA seeds: ["inbox", name_hash]
 /// Zero-copy. INBOX_SIZE = 64 (power of 2 for bytemuck compatibility).
-/// Layout: entries(64×16=1024) + head(1) + count(1) + _pad(6) = 1032 bytes
+/// SIZE = 8 + size_of::<Self>()
 #[account(zero_copy)]
 #[repr(C)]
 pub struct InboxAccount {

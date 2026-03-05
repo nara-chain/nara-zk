@@ -29,7 +29,7 @@ pub struct Initialize<'info> {
     )]
     pub merkle_tree: AccountLoader<'info, MerkleTreeAccount>,
 
-    /// Pool is small (PoolAccount::SIZE = 17 bytes), safe to init in-transaction.
+    /// Pool is small, safe to init in-transaction.
     #[account(
         init, payer = payer, space = PoolAccount::SIZE,
         seeds = [b"pool", denomination.to_le_bytes().as_ref()],
