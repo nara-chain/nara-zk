@@ -7,11 +7,10 @@ pub(crate) fn handle(
     fee_recipient: Pubkey,
     fee_amount: u64,
 ) -> Result<()> {
-    let config = &mut ctx.accounts.config;
+    let mut config = ctx.accounts.config.load_init()?;
     config.admin = ctx.accounts.admin.key();
     config.fee_recipient = fee_recipient;
     config.fee_amount = fee_amount;
-    config.bump = ctx.bumps.config;
 
     msg!("Config initialized, fee: {} lamports", fee_amount);
     Ok(())
@@ -27,7 +26,7 @@ pub struct InitializeConfig<'info> {
         seeds = [b"config"],
         bump,
     )]
-    pub config: Account<'info, ConfigAccount>,
+    pub config: AccountLoader<'info, ConfigAccount>,
 
     pub system_program: Program<'info, System>,
 }

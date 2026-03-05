@@ -26,8 +26,6 @@ pub(crate) fn handle(
     let proof_arr: [u8; 256] = proof.try_into().map_err(|_| error!(NaraZkError::InvalidProof))?;
     verify_withdraw_proof(&proof_arr, &[root, nullifier_hash, recipient.to_bytes()])?;
 
-    ctx.accounts.nullifier.bump = ctx.bumps.nullifier;
-
     **ctx.accounts.pool.to_account_info().try_borrow_mut_lamports()? -= denomination;
     **ctx.accounts.recipient.to_account_info().try_borrow_mut_lamports()? += denomination;
 
@@ -50,7 +48,7 @@ pub struct Withdraw<'info> {
 
     #[account(
         seeds = [b"tree", denomination.to_le_bytes().as_ref()],
-        bump = merkle_tree.load()?.bump,
+        bump,
     )]
     pub merkle_tree: AccountLoader<'info, MerkleTreeAccount>,
 
@@ -64,7 +62,7 @@ pub struct Withdraw<'info> {
     #[account(
         mut,
         seeds = [b"pool", denomination.to_le_bytes().as_ref()],
-        bump = pool.bump,
+        bump,
     )]
     pub pool: Account<'info, PoolAccount>,
 

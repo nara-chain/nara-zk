@@ -8,10 +8,9 @@ pub(crate) fn handle(ctx: Context<Initialize>, denomination: u64) -> Result<()> 
     require!(DENOMINATIONS.contains(&denomination), NaraZkError::InvalidDenomination);
 
     ctx.accounts.pool.denomination = denomination;
-    ctx.accounts.pool.bump = ctx.bumps.pool;
 
     let mut tree = ctx.accounts.merkle_tree.load_init()?;
-    tree.init(denomination, ctx.bumps.merkle_tree);
+    tree.init(denomination);
 
     msg!("Initialized pool: {} lamports", denomination);
     Ok(())

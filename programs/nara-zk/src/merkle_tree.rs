@@ -5,10 +5,9 @@ use crate::poseidon;
 use crate::state::MerkleTreeAccount;
 
 impl MerkleTreeAccount {
-    pub fn init(&mut self, denomination: u64, bump: u8) {
+    pub fn init(&mut self, denomination: u64) {
         self.levels = MERKLE_TREE_LEVELS as u32;
         self.denomination = denomination;
-        self.bump = bump;
         self.next_index = 0;
         self.current_root_index = 0;
 

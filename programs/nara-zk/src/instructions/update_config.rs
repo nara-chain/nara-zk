@@ -9,7 +9,7 @@ pub(crate) fn handle(
     new_fee_recipient: Pubkey,
     new_fee_amount: u64,
 ) -> Result<()> {
-    let config = &mut ctx.accounts.config;
+    let mut config = ctx.accounts.config.load_mut()?;
     config.admin = new_admin;
     config.fee_recipient = new_fee_recipient;
     config.fee_amount = new_fee_amount;
@@ -25,8 +25,8 @@ pub struct UpdateConfig<'info> {
     #[account(
         mut,
         seeds = [b"config"],
-        bump = config.bump,
-        has_one = admin @ NaraZkError::Unauthorized,
+        bump,
+        constraint = config.load()?.admin == admin.key() @ NaraZkError::Unauthorized,
     )]
-    pub config: Account<'info, ConfigAccount>,
+    pub config: AccountLoader<'info, ConfigAccount>,
 }

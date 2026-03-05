@@ -58,23 +58,23 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub depositor: Signer<'info>,
 
-    #[account(mut, seeds = [b"zk_id", name_hash.as_ref()], bump = zk_id.bump)]
+    #[account(mut, seeds = [b"zk_id", name_hash.as_ref()], bump)]
     pub zk_id: Account<'info, ZkIdAccount>,
 
-    #[account(mut, seeds = [b"inbox", name_hash.as_ref()], bump = inbox.load()?.bump)]
+    #[account(mut, seeds = [b"inbox", name_hash.as_ref()], bump)]
     pub inbox: AccountLoader<'info, InboxAccount>,
 
     #[account(
         mut,
         seeds = [b"tree", denomination.to_le_bytes().as_ref()],
-        bump = merkle_tree.load()?.bump,
+        bump,
     )]
     pub merkle_tree: AccountLoader<'info, MerkleTreeAccount>,
 
     #[account(
         mut,
         seeds = [b"pool", denomination.to_le_bytes().as_ref()],
-        bump = pool.bump,
+        bump,
     )]
     pub pool: Account<'info, PoolAccount>,
 

@@ -29,6 +29,6 @@ pub struct TransferZkId<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(mut, seeds = [b"zk_id", name_hash.as_ref()], bump = zk_id.bump)]
+    #[account(mut, seeds = [b"zk_id", name_hash.as_ref()], bump)]
     pub zk_id: Account<'info, ZkIdAccount>,
 }

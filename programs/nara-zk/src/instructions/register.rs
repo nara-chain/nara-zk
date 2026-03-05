@@ -9,7 +9,7 @@ pub(crate) fn handle(
     name_hash: [u8; 32],
     id_commitment: [u8; 32],
 ) -> Result<()> {
-    let fee = ctx.accounts.config.fee_amount;
+    let fee = ctx.accounts.config.load()?.fee_amount;
     if fee > 0 {
         system_program::transfer(
             CpiContext::new(
@@ -28,12 +28,10 @@ pub(crate) fn handle(
     zk_id.id_commitment = id_commitment;
     zk_id.deposit_count = 0;
     zk_id.commitment_start_index = 0;
-    zk_id.bump = ctx.bumps.zk_id;
 
     let mut inbox = ctx.accounts.inbox.load_init()?;
     inbox.head = 0;
     inbox.count = 0;
-    inbox.bump = ctx.bumps.inbox;
 
     msg!("Registered ZK ID, fee paid: {} lamports", fee);
     Ok(())
@@ -62,15 +60,15 @@ pub struct Register<'info> {
 
     #[account(
         seeds = [b"config"],
-        bump = config.bump,
+        bump,
     )]
-    pub config: Account<'info, ConfigAccount>,
+    pub config: AccountLoader<'info, ConfigAccount>,
 
     /// Receives the registration fee. Must match config.fee_recipient.
     /// CHECK: key is validated by the constraint below.
     #[account(
         mut,
-        constraint = fee_recipient.key() == config.fee_recipient @ NaraZkError::InvalidFeeRecipient,
+        constraint = fee_recipient.key() == config.load()?.fee_recipient @ NaraZkError::InvalidFeeRecipient,
     )]
     pub fee_recipient: UncheckedAccount<'info>,
 
