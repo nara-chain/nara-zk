@@ -430,7 +430,7 @@ pub struct ConfigAccount {              // zero_copy
     pub fee_recipient: Pubkey,  // receives registration fees
     pub fee_amount:    u64,     // lamports per registration; 0 = free
 }
-// Total: 8 (discriminator) + 32 + 32 + 8 = 80 bytes
+// SIZE = 8 (discriminator) + size_of::<Self>()
 ```
 
 Singleton PDA. Anchor's `init` constraint guarantees it can only be created once.
@@ -444,7 +444,7 @@ pub struct ZkIdAccount {
     pub deposit_count:          u32,      // total deposits; equals the next depositIndex
     pub commitment_start_index: u32,      // depositIndex at which the current commitment became active
 }
-// Total: 8 + 32 + 32 + 4 + 4 = 80 bytes
+// SIZE = 8 (discriminator) + INIT_SPACE
 ```
 
 `commitment_start_index` partitions deposits by ownership epoch:
