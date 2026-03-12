@@ -426,14 +426,14 @@ solana_poseidon::hashv(
 
 ```rust
 pub struct ConfigAccount {              // zero_copy
-    pub admin:         Pubkey,  // sole authority for update_config
-    pub fee_recipient: Pubkey,  // receives registration fees
-    pub fee_amount:    u64,     // lamports per registration; 0 = free
+    pub admin:     Pubkey,  // sole authority for update_config / withdraw_fees
+    pub fee_vault: Pubkey,  // PDA ["fee_vault"]; receives registration fees
+    pub fee_amount: u64,    // lamports per registration; 0 = free
 }
 // SIZE = 8 (discriminator) + size_of::<Self>()
 ```
 
-Singleton PDA. Anchor's `init` constraint guarantees it can only be created once.
+Singleton PDA. Anchor's `init` constraint guarantees it can only be created once. The `fee_vault` address is saved during `initialize_config` and points to the deterministic `["fee_vault"]` PDA that collects registration fees.
 
 ### `ZkIdAccount` — seed `["zk_id", name_hash]`
 
@@ -475,9 +475,11 @@ Empty account (8-byte discriminator only). Its mere existence marks the correspo
 ### `initialize_config`
 
 ```
-accounts : admin (Signer, writable), config (init PDA ["config"]), system_program
-params   : fee_recipient: Pubkey, fee_amount: u64
-effect   : Creates ConfigAccount; sets config.admin = caller.
+accounts : admin (Signer, writable), config (init PDA ["config"]),
+           fee_vault (PDA ["fee_vault"]), system_program
+params   : fee_amount: u64
+effect   : Creates ConfigAccount; sets config.admin = caller,
+           config.fee_vault = fee_vault PDA address.
            Can only be called once (Anchor init constraint).
 ```
 
@@ -485,10 +487,20 @@ effect   : Creates ConfigAccount; sets config.admin = caller.
 
 ```
 accounts : admin (Signer), config (mut PDA, constraint: admin == config.admin)
-params   : new_admin: Pubkey, new_fee_recipient: Pubkey, new_fee_amount: u64
-effect   : Updates all three fields. The constraint enforces that only
+params   : new_admin: Pubkey, new_fee_amount: u64
+effect   : Updates admin and fee_amount. The constraint enforces that only
            the current admin can call this; the old admin is immediately locked
            out after a transfer.
+```
+
+### `withdraw_fees`
+
+```
+accounts : admin (Signer, writable), config (PDA, constraint: admin == config.admin),
+           fee_vault (mut PDA ["fee_vault"]), system_program
+params   : amount: u64
+effect   : Transfers amount lamports from fee_vault to admin using PDA signing.
+           Only the current admin can call this.
 ```
 
 ### `initialize`
@@ -506,11 +518,10 @@ effect   : Creates MerkleTreeAccount (filled_subtrees and roots initialised to
 
 ```
 accounts : payer (Signer, writable), zk_id (init PDA), inbox (init PDA),
-           config (PDA), fee_recipient (writable, key == config.fee_recipient),
-           system_program
+           config (PDA), fee_vault (mut PDA ["fee_vault"]), system_program
 params   : name_hash: [u8; 32], id_commitment: [u8; 32]
 effect   : 1. If config.fee_amount > 0, CPI-transfers fee_amount lamports
-              from payer to fee_recipient.
+              from payer to fee_vault.
            2. Initialises ZkIdAccount (deposit_count = 0,
               commitment_start_index = 0).
            3. Initialises InboxAccount (head = 0, count = 0).
@@ -619,7 +630,7 @@ programs/nara-zk/src/
 │                               # #[program] dispatch
 ├── constants.rs                # MERKLE_TREE_LEVELS = 64, ROOT_HISTORY_SIZE = 30,
 │                               # DENOMINATIONS, INBOX_SIZE = 64, zero_value()
-├── errors.rs                   # NaraZkError enum (10 variants)
+├── errors.rs                   # NaraZkError enum (10 variants incl. Unauthorized)
 ├── events.rs                   # DepositEvent / WithdrawEvent / TransferZkIdEvent
 ├── merkle_tree.rs              # MerkleTreeAccount::insert() — O(levels) incremental insert
 ├── poseidon.rs                 # hash_pair() — wraps solana_poseidon syscall
@@ -635,6 +646,7 @@ programs/nara-zk/src/
 └── instructions/
     ├── initialize_config.rs
     ├── update_config.rs
+    ├── withdraw_fees.rs
     ├── initialize.rs
     ├── register.rs
     ├── deposit.rs
@@ -659,7 +671,7 @@ app/
                                 # buildMerklePath(), computeZeros(), packProof()
 
 tests/
-└── nara-zk.ts                  # 24 integration tests using real Groth16 proofs
+└── nara-zk.ts                  # 26 integration tests using real Groth16 proofs
 ```
 
 ---
@@ -679,7 +691,7 @@ yarn install        # Install JavaScript dependencies
 
 anchor build        # Compile the Rust program; generates target/types/nara_zk.ts
 
-anchor test         # Spin up a local validator and run the 24-test suite
+anchor test         # Spin up a local validator and run the 26-test suite
                     # All tests use real Groth16 proofs; expect ~14 seconds total
 ```
 
@@ -701,15 +713,16 @@ const idSecret = await deriveIdSecret(
 );
 ```
 
-### Test Coverage (24 tests)
+### Test Coverage (26 tests)
 
 | Category | Count |
 |----------|-------|
 | Config management (initialize / update / permissions / singleton / admin transfer) | 6 |
+| Fee management (withdraw_fees success / unauthorized rejection) | 2 |
 | Merkle tree + pool initialization (including invalid denomination rejection) | 3 |
 | Alice happy path (register with fee verification / deposit / withdraw) | 4 |
 | Double-spend prevention | 2 |
 | ZK ID transfer (success / wrong proof rejection / post-transfer ownership isolation) | 3 |
 | Withdrawal error cases (InvalidProof / UnknownRoot / recipient mismatch) | 3 |
 | Bob multi-deposit flow with full on-chain data retrieval | 3 |
-| **Total** | **24** |
+| **Total** | **26** |
