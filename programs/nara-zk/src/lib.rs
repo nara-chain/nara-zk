@@ -20,6 +20,7 @@ pub use instructions::update_config::*;
 pub use instructions::withdraw::*;
 pub use instructions::withdraw_fees::*;
 
+// declare_id!("ZKidentity111111111111111111111111111111111");
 declare_id!("Dp4Jb4fmfK1HHVzjMAnWumE5iLuzDsfc4VdRVL7XmY82");
 
 #[program]

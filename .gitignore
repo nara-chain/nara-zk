@@ -13,4 +13,5 @@ circuits/build/**/*_0000.zkey
 circuits/build/rust/
 
 test_deploy.sh
+test_dist.sh
 .env
