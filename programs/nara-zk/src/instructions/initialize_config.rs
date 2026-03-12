@@ -2,14 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::state::ConfigAccount;
 
-pub(crate) fn handle(
-    ctx: Context<InitializeConfig>,
-    fee_recipient: Pubkey,
-    fee_amount: u64,
-) -> Result<()> {
+pub(crate) fn handle(ctx: Context<InitializeConfig>, fee_amount: u64) -> Result<()> {
     let mut config = ctx.accounts.config.load_init()?;
     config.admin = ctx.accounts.admin.key();
-    config.fee_recipient = fee_recipient;
+    config.fee_vault = ctx.accounts.fee_vault.key();
     config.fee_amount = fee_amount;
 
     msg!("Config initialized, fee: {} lamports", fee_amount);
@@ -27,6 +23,13 @@ pub struct InitializeConfig<'info> {
         bump,
     )]
     pub config: AccountLoader<'info, ConfigAccount>,
+
+    /// CHECK: fee vault PDA, derived deterministically.
+    #[account(
+        seeds = [b"fee_vault"],
+        bump,
+    )]
+    pub fee_vault: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }

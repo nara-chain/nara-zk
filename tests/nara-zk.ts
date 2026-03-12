@@ -11,6 +11,7 @@ import {
   findZkIdPda,
   findInboxPda,
   findConfigPda,
+  findFeeVaultPda,
   DENOMINATIONS,
   toBytes32,
 } from "../app/utils";
@@ -39,7 +40,6 @@ describe("nara-zk", () => {
 
   // ── Config shared state ────────────────────────────────────────────────────
   const FEE_AMOUNT = LAMPORTS_PER_SOL; // 1 SOL default registration fee
-  const feeRecipient = Keypair.generate();
 
   // ── Shared state across tests ──────────────────────────────────────────────
   const ALICE = "alice";
@@ -77,22 +77,21 @@ describe("nara-zk", () => {
     const [configPda] = findConfigPda(program.programId);
 
     await program.methods
-      .initializeConfig(feeRecipient.publicKey, new anchor.BN(FEE_AMOUNT))
+      .initializeConfig(new anchor.BN(FEE_AMOUNT))
       .accounts({ admin: payer.publicKey })
       .rpc();
 
+    const [feeVaultPda] = findFeeVaultPda(program.programId);
     const configData = await program.account.configAccount.fetch(configPda);
     expect(configData.admin.toString()).to.equal(payer.publicKey.toString());
-    expect(configData.feeRecipient.toString()).to.equal(
-      feeRecipient.publicKey.toString()
-    );
+    expect(configData.feeVault.toString()).to.equal(feeVaultPda.toString());
     expect(configData.feeAmount.toString()).to.equal(FEE_AMOUNT.toString());
   });
 
   it("initialize_config: rejects duplicate initialization (singleton)", async () => {
     try {
       await program.methods
-        .initializeConfig(feeRecipient.publicKey, new anchor.BN(0))
+        .initializeConfig(new anchor.BN(0))
         .accounts({ admin: payer.publicKey })
         .rpc();
       expect.fail("Expected duplicate init to fail");
@@ -118,20 +117,21 @@ describe("nara-zk", () => {
 
   // ── register ─────────────────────────────────────────────────────────────────
 
-  it("register: creates ZK ID for alice, collects 1 SOL registration fee", async () => {
+  it("register: creates ZK ID for alice, collects 1 SOL fee into vault", async () => {
     aliceIdSecret = await deriveIdSecret(makeKeypairSigner(payer.secretKey), ALICE);
     const commitment = await computeIdCommitment(aliceIdSecret);
     aliceIdCommitmentBuf = commitmentToBytes(commitment);
 
-    const feeBalBefore = await provider.connection.getBalance(feeRecipient.publicKey);
+    const [vaultPda] = findFeeVaultPda(program.programId);
+    const vaultBalBefore = await provider.connection.getBalance(vaultPda);
 
     await program.methods
       .register(toBytes32(aliceHash), toBytes32(aliceIdCommitmentBuf))
-      .accounts({ payer: payer.publicKey, feeRecipient: feeRecipient.publicKey })
+      .accounts({ payer: payer.publicKey })
       .rpc();
 
-    const feeBalAfter = await provider.connection.getBalance(feeRecipient.publicKey);
-    expect(feeBalAfter - feeBalBefore).to.equal(FEE_AMOUNT);
+    const vaultBalAfter = await provider.connection.getBalance(vaultPda);
+    expect(vaultBalAfter - vaultBalBefore).to.equal(FEE_AMOUNT);
 
     const [zkIdPda] = findZkIdPda(aliceHash, program.programId);
     const zkIdData = await program.account.zkIdAccount.fetch(zkIdPda);
@@ -431,14 +431,14 @@ describe("nara-zk", () => {
   // Tree state at this point: alice has 2 deposits (leafIndex 0 and 1).
   // Bob's deposits will occupy leafIndex 2 and 3.
 
-  it("register: creates ZK ID for bob, collects 1 SOL registration fee", async () => {
+  it("register: creates ZK ID for bob, collects 1 SOL fee into vault", async () => {
     bobIdSecret = await deriveIdSecret(makeKeypairSigner(payer.secretKey), BOB);
     const commitment = await computeIdCommitment(bobIdSecret);
     bobIdCommitmentBuf = commitmentToBytes(commitment);
 
     await program.methods
       .register(toBytes32(bobHash), toBytes32(bobIdCommitmentBuf))
-      .accounts({ payer: payer.publicKey, feeRecipient: feeRecipient.publicKey })
+      .accounts({ payer: payer.publicKey })
       .rpc();
 
     const [zkIdPda] = findZkIdPda(bobHash, program.programId);
@@ -652,7 +652,7 @@ describe("nara-zk", () => {
     const [configPda] = findConfigPda(program.programId);
 
     await program.methods
-      .updateConfig(payer.publicKey, feeRecipient.publicKey, new anchor.BN(0))
+      .updateConfig(payer.publicKey, new anchor.BN(0))
       .accounts({ admin: payer.publicKey })
       .rpc();
 
@@ -664,11 +664,7 @@ describe("nara-zk", () => {
     const [configPda] = findConfigPda(program.programId);
 
     await program.methods
-      .updateConfig(
-        payer.publicKey,
-        feeRecipient.publicKey,
-        new anchor.BN(FEE_AMOUNT)
-      )
+      .updateConfig(payer.publicKey, new anchor.BN(FEE_AMOUNT))
       .accounts({ admin: payer.publicKey })
       .rpc();
 
@@ -680,7 +676,7 @@ describe("nara-zk", () => {
     const stranger = Keypair.generate();
     try {
       await program.methods
-        .updateConfig(stranger.publicKey, feeRecipient.publicKey, new anchor.BN(0))
+        .updateConfig(stranger.publicKey, new anchor.BN(0))
         .accounts({ admin: stranger.publicKey })
         .signers([stranger])
         .rpc();
@@ -696,7 +692,7 @@ describe("nara-zk", () => {
 
     // Transfer admin to newAdmin
     await program.methods
-      .updateConfig(newAdmin.publicKey, feeRecipient.publicKey, new anchor.BN(FEE_AMOUNT))
+      .updateConfig(newAdmin.publicKey, new anchor.BN(FEE_AMOUNT))
       .accounts({ admin: payer.publicKey })
       .rpc();
 
@@ -706,7 +702,7 @@ describe("nara-zk", () => {
     // Old admin (payer) should now be rejected
     try {
       await program.methods
-        .updateConfig(payer.publicKey, feeRecipient.publicKey, new anchor.BN(0))
+        .updateConfig(payer.publicKey, new anchor.BN(0))
         .accounts({ admin: payer.publicKey })
         .rpc();
       expect.fail("Expected Unauthorized for old admin");
@@ -716,13 +712,49 @@ describe("nara-zk", () => {
 
     // New admin transfers ownership back to payer (cleanup for subsequent tests)
     await program.methods
-      .updateConfig(payer.publicKey, feeRecipient.publicKey, new anchor.BN(FEE_AMOUNT))
+      .updateConfig(payer.publicKey, new anchor.BN(FEE_AMOUNT))
       .accounts({ admin: newAdmin.publicKey })
       .signers([newAdmin])
       .rpc();
 
     configData = await program.account.configAccount.fetch(configPda);
     expect(configData.admin.toString()).to.equal(payer.publicKey.toString());
+  });
+
+  // ── withdraw_fees ──────────────────────────────────────────────────────────
+
+  it("withdraw_fees: admin withdraws fees from vault", async () => {
+    const [vaultPda] = findFeeVaultPda(program.programId);
+    const vaultBal = await provider.connection.getBalance(vaultPda);
+    expect(vaultBal).to.be.greaterThan(0);
+
+    const adminBalBefore = await provider.connection.getBalance(payer.publicKey);
+
+    await program.methods
+      .withdrawFees(new anchor.BN(vaultBal))
+      .accounts({ admin: payer.publicKey })
+      .rpc();
+
+    const vaultBalAfter = await provider.connection.getBalance(vaultPda);
+    expect(vaultBalAfter).to.equal(0);
+
+    const adminBalAfter = await provider.connection.getBalance(payer.publicKey);
+    // admin balance increases by vault amount minus tx fee
+    expect(adminBalAfter).to.be.greaterThan(adminBalBefore);
+  });
+
+  it("withdraw_fees: rejects non-admin signer (Unauthorized)", async () => {
+    const stranger = Keypair.generate();
+    try {
+      await program.methods
+        .withdrawFees(new anchor.BN(1))
+        .accounts({ admin: stranger.publicKey })
+        .signers([stranger])
+        .rpc();
+      expect.fail("Expected Unauthorized");
+    } catch (err: any) {
+      expect(err.message).to.match(/Unauthorized|Caller is not the program admin/i);
+    }
   });
 
   // ── multi-denomination ───────────────────────────────────────────────────────

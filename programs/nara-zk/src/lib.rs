@@ -18,6 +18,7 @@ pub use instructions::register::*;
 pub use instructions::transfer_zk_id::*;
 pub use instructions::update_config::*;
 pub use instructions::withdraw::*;
+pub use instructions::withdraw_fees::*;
 
 declare_id!("Dp4Jb4fmfK1HHVzjMAnWumE5iLuzDsfc4VdRVL7XmY82");
 
@@ -25,21 +26,20 @@ declare_id!("Dp4Jb4fmfK1HHVzjMAnWumE5iLuzDsfc4VdRVL7XmY82");
 pub mod nara_zk {
     use super::*;
 
-    pub fn initialize_config(
-        ctx: Context<InitializeConfig>,
-        fee_recipient: Pubkey,
-        fee_amount: u64,
-    ) -> Result<()> {
-        instructions::initialize_config::handle(ctx, fee_recipient, fee_amount)
+    pub fn initialize_config(ctx: Context<InitializeConfig>, fee_amount: u64) -> Result<()> {
+        instructions::initialize_config::handle(ctx, fee_amount)
     }
 
     pub fn update_config(
         ctx: Context<UpdateConfig>,
         new_admin: Pubkey,
-        new_fee_recipient: Pubkey,
         new_fee_amount: u64,
     ) -> Result<()> {
-        instructions::update_config::handle(ctx, new_admin, new_fee_recipient, new_fee_amount)
+        instructions::update_config::handle(ctx, new_admin, new_fee_amount)
+    }
+
+    pub fn withdraw_fees(ctx: Context<WithdrawFees>, amount: u64) -> Result<()> {
+        instructions::withdraw_fees::handle(ctx, amount)
     }
 
     pub fn initialize(ctx: Context<Initialize>, denomination: u64) -> Result<()> {

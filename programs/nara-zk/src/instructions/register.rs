@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-use crate::errors::NaraZkError;
 use crate::state::{ConfigAccount, InboxAccount, ZkIdAccount};
 
 pub(crate) fn handle(
@@ -16,7 +15,7 @@ pub(crate) fn handle(
                 ctx.accounts.system_program.to_account_info(),
                 system_program::Transfer {
                     from: ctx.accounts.payer.to_account_info(),
-                    to: ctx.accounts.fee_recipient.to_account_info(),
+                    to: ctx.accounts.fee_vault.to_account_info(),
                 },
             ),
             fee,
@@ -64,13 +63,13 @@ pub struct Register<'info> {
     )]
     pub config: AccountLoader<'info, ConfigAccount>,
 
-    /// Receives the registration fee. Must match config.fee_recipient.
-    /// CHECK: key is validated by the constraint below.
+    /// CHECK: fee vault PDA receives registration fees.
     #[account(
         mut,
-        constraint = fee_recipient.key() == config.load()?.fee_recipient @ NaraZkError::InvalidFeeRecipient,
+        seeds = [b"fee_vault"],
+        bump,
     )]
-    pub fee_recipient: UncheckedAccount<'info>,
+    pub fee_vault: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }

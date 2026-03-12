@@ -6,12 +6,10 @@ use crate::state::ConfigAccount;
 pub(crate) fn handle(
     ctx: Context<UpdateConfig>,
     new_admin: Pubkey,
-    new_fee_recipient: Pubkey,
     new_fee_amount: u64,
 ) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
     config.admin = new_admin;
-    config.fee_recipient = new_fee_recipient;
     config.fee_amount = new_fee_amount;
 
     msg!("Config updated, fee: {} lamports", new_fee_amount);

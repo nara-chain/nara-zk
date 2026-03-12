@@ -32,6 +32,6 @@ pub enum NaraZkError {
     #[msg("Caller is not the program admin")]
     Unauthorized,
 
-    #[msg("Fee recipient account does not match config")]
-    InvalidFeeRecipient,
+    #[msg("Insufficient vault balance")]
+    InsufficientVaultBalance,
 }

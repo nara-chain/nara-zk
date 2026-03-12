@@ -75,6 +75,10 @@ export function findConfigPda(programId = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([Buffer.from("config")], programId);
 }
 
+export function findFeeVaultPda(programId = PROGRAM_ID): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from("fee_vault")], programId);
+}
+
 export function findNullifierPda(
   denomination: BN,
   nullifierHash: Buffer,
